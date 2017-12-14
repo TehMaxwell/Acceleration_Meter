@@ -1,0 +1,6 @@
+1:We have 6 Arduino display test codes and 6 SD card test codes
+2:Our test codes apply with UNO R3 and Mega 2560 boards. You can directly plug it onto your board and test. No need of wiring.
+3:Example01-Simple tes is the easiest test as it doesnt need any installation of libraries and you can use the RGB codes to test out the screen quality.
+4:Example02~06 need to install libraries .Please copy the files in Install libraries to the path of your Arduino file.
+5:SDCard Exten Example and Example05-ShowBMP will need SD card and test programs that involves SD card can work on UNO R3 board only.
+6:Our test codes uses Arduino IDE of arduino-1.6.2-windows. If you use older version of IDE you may get compiling errors so please use updated version of IDE.
