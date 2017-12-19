@@ -27,7 +27,7 @@
 // used as the CS pin, the hardware CS pin (10 on most Arduino boards,
 // 53 on the Mega) must be left as an output or the SD library
 // functions will not work.
-const int chipSelect = 53;
+const int chipSelect = 10;
 
 void setup()
 {
@@ -53,7 +53,7 @@ void setup()
   
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  File dataFile = SD.open("datalog.txt");
+  File dataFile = SD.open("History_Screen.bmp");
 
   // if the file is available, write to it:
   if (dataFile) {

@@ -5,6 +5,7 @@
  * 
  * Originially Developed By: Sam Maxwell
  * Release Date: INSERT RELEASE DATE HERE
+ * Version Number: INSERT INITIAL VERSION NUMBER HERE
  * For more Information on Hardware, Software and Design Files please visit the Github Page for this project located here: https://github.com/TehMaxwell/Acceleration_Meter
  */
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -15,6 +16,8 @@
 #include <TouchScreen.h>      //Touch Screen Hardware Specific Library
 #include <SD.h>               //SD Card Library
 #include <SPI.h>              //Serial Peripheral Interface (SPI) Library
+#include <pin_magic.h>
+#include <registers.h>
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //DEFINITIONS
@@ -56,9 +59,22 @@
 #define GREEN   0x07E0
 #define WHITE   0xFFFF
 
+//BMP FILES
+//BMP File Parameters
+#define BUFFPIXEL 240  //The size of the buffer used to store BMP File data
+#define BMP_HEIGHT 320   //BMP Image Height
+#define BMP_WIDTH 240    //BMP Image Width
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //VARIABLES
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+//GUI
+//GUI File Names
+char* gui_file_names[4] = {"NAS.bmp", "GAS.bmp", "HIST.bmp", "SET.bmp"};   //The names of the GUI BMP Files
+
+//BMP FILES
+//BMP File Parameters
+unsigned char bmp_data_offset = 0;  //The offset between the start of the BMP File and the RGB Data
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //OBJECTS
@@ -72,15 +88,76 @@ Elegoo_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //FUNCTIONS
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+//SD CARD FUNCTIONS
+//Read the next 16 Bit Word from the File and convert it to Little Endian
+uint16_t read16(File f)
+{
+    uint16_t d;
+    uint8_t b;
+    b = f.read();
+    d = f.read();
+    d <<= 8;
+    d |= b;
+    return d;
+}
+
+//Read the next 32 Bit Word from the File and convert it to Little Endian
+uint32_t read32(File f)
+{
+    uint32_t d;
+    uint16_t b;
+    b = read16(f);
+    d = read16(f);
+    d <<= 16;
+    d |= b;
+    return d;
+}
+
+//Get the RGB Data offset value from the BMP File
+void get_bmp_rgb_data_offset(File bmpFile) 
+{ 
+    bmpFile.seek(10); //Seeking to the RGB Data offset value
+    bmp_data_offset = read32(bmpFile);
+}
+
+//TFT LCD FUNCTIONS
+//Write a BMP Image to the TFT LCD Display
+void bmpdraw(File bmpFile){
+    uint8_t bmp_buff[BUFFPIXEL * 3]; //Buffer to store RGB Data
+    
+    bmpFile.seek(bmp_data_offset);  //Seeking to RGB Data Start in BMP File
+    
+    //For all columns of the Image
+    for (int column = 0; column < BMP_HEIGHT; column++) {
+        //For all Rows of the Image, in chunks the size of the RGB Buffer
+        for(int rgb_data_chunk = 0; rgb_data_chunk < (BMP_WIDTH / BUFFPIXEL); rgb_data_chunk++) {
+            int buff_index = 0;
+            int offset_x = rgb_data_chunk * BUFFPIXEL;  //Current Data Chunk Offset along Screen Width in Pixels
+            unsigned int color[BUFFPIXEL];
+            
+            bmpFile.read(bmp_buff, BUFFPIXEL * 3);
+            
+            for(int row = 0; row < BUFFPIXEL; row++) {
+                color[row] = bmp_buff[buff_index + 2] >> 3;                      //Red Colour Data
+                color[row] = color[row] << 6 | (bmp_buff[buff_index + 1] >> 2);    //Green Colour Data
+                color[row] = color[row] << 5 | (bmp_buff[buff_index + 0] >> 3);    //Blue Colour Data
+                tft.drawPixel(row + offset_x, column, color[row]);
+                buff_index += 3;
+            }
+        }
+    }
+}
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //MAIN SETUP
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void setup(){
+  //Beginning Serial Communications for Debugging
+  Serial.begin(9600);
+  
   //TFT LCD Setup
   tft.reset();  //Resetting the LCD Display
   tft.begin(TFT_IDENTIFIER);  //Beginning Communications with the TFT LCD Driver Chip
-  tft.setRotation(135);
 
   //SD Card Reader Setup
   //Initializing SD Card Communications
@@ -91,13 +168,20 @@ void setup(){
     tft.setTextColor(WHITE);
     tft.setTextSize(2);
     tft.println("Failed to Initialize\nSD Card");
-  }
+  } 
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //MAIN LOOP
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void loop(){
-  
+  for (int index = 0; index < 4; index++){
+    //Showing the BMP File
+    File bmpFile = SD.open(gui_file_names[index]);
+    get_bmp_rgb_data_offset(bmpFile);
+    bmpdraw(bmpFile);
+    bmpFile.close();
+    delay(5000);
+  }
 }
 

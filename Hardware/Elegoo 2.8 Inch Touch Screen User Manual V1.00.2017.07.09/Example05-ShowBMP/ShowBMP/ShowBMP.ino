@@ -50,10 +50,10 @@ Elegoo_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
 
 #define MAX_BMP         10                      // bmp file num
-#define FILENAME_LEN    20                      // max file name length
+#define FILENAME_LEN    40                      // max file name length
 
-const int __Gnbmp_height = 320;                 // bmp hight
-const int __Gnbmp_width  = 240;                 // bmp width
+const int __Gnbmp_height = 240;                 // bmp hight
+const int __Gnbmp_width  = 320;                 // bmp width
 
 unsigned char __Gnbmp_image_offset  = 0;        // offset
 
@@ -61,9 +61,7 @@ int __Gnfile_num = 5;                           // num of file
 
 char __Gsbmp_files[5][FILENAME_LEN] =           // add file name here
 {
-"flower.bmp",
-"tiger.bmp",
-"tree.bmp",
+"Settings_Screen.bmp",
 "RedRose.bmp",
 "Penguins.bmp"
 };
