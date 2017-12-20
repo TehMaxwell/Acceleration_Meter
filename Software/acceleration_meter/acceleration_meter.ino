@@ -18,6 +18,9 @@
 #include <SPI.h>              //Serial Peripheral Interface (SPI) Library
 #include <pin_magic.h>
 #include <registers.h>
+#include <helper_3dmath.h>    //Library for 3 Dimensional Mathematics Calculations
+#include <MPU60X0.h>          //I2C Comms with Accelerometer Unit
+#include <MPU60X0_6Axis_MotionApps20.h>
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //DEFINITIONS
@@ -58,12 +61,22 @@
 #define RED     0xF800
 #define GREEN   0x07E0
 #define WHITE   0xFFFF
+#define GREY    0xB3B3B3
 
 //BMP FILES
 //BMP File Parameters
 #define BUFFPIXEL 240  //The size of the buffer used to store BMP File data
 #define BMP_HEIGHT 320   //BMP Image Height
 #define BMP_WIDTH 240    //BMP Image Width
+
+//GUI
+//Numerical Acceleration Screen Parameters
+#define AXIAL_X_COORD_NAS 20
+#define AXIAL_Y_COORD_NAS 79
+#define LATERAL_X_COORD_NAS 20
+#define LATERAL_Y_COORD_NAS 136
+#define VERTICAL_X_COORD_NAS 20
+#define VERTICAL_Y_COORD_NAS 193
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //VARIABLES
@@ -122,9 +135,10 @@ void get_bmp_rgb_data_offset(File bmpFile)
 
 //TFT LCD FUNCTIONS
 //Write a BMP Image to the TFT LCD Display
-void bmpdraw(File bmpFile){
+void bmp_draw(File bmpFile){
     uint8_t bmp_buff[BUFFPIXEL * 3]; //Buffer to store RGB Data
-    
+
+    get_bmp_rgb_data_offset(bmpFile);
     bmpFile.seek(bmp_data_offset);  //Seeking to RGB Data Start in BMP File
     
     //For all columns of the Image
@@ -148,6 +162,22 @@ void bmpdraw(File bmpFile){
     }
 }
 
+//Write some Text to the TFT LCD at the given Coordinates
+void text_draw(char* text, int colour, int x, int y){
+  tft.setRotation(135);   //Setting the screen rotation to landscape
+  tft.setCursor(x, y);
+  tft.setTextColor(colour);
+  tft.setTextSize(2);
+  tft.println(text);
+  tft.setRotation(0);
+}
+
+//TEST FUNCTIONS
+//Generate a random floating point number
+float gen_rand_num(){
+  return (random(-500, 500) / 100.0);
+}
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //MAIN SETUP
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -168,20 +198,13 @@ void setup(){
     tft.setTextColor(WHITE);
     tft.setTextSize(2);
     tft.println("Failed to Initialize\nSD Card");
-  } 
+  }
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //MAIN LOOP
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void loop(){
-  for (int index = 0; index < 4; index++){
-    //Showing the BMP File
-    File bmpFile = SD.open(gui_file_names[index]);
-    get_bmp_rgb_data_offset(bmpFile);
-    bmpdraw(bmpFile);
-    bmpFile.close();
-    delay(5000);
-  }
+  
 }
 
