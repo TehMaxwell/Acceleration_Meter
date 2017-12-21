@@ -16,11 +16,6 @@
 #include <TouchScreen.h>      //Touch Screen Hardware Specific Library
 #include <SD.h>               //SD Card Library
 #include <SPI.h>              //Serial Peripheral Interface (SPI) Library
-#include <pin_magic.h>
-#include <registers.h>
-#include <helper_3dmath.h>    //Library for 3 Dimensional Mathematics Calculations
-#include <MPU60X0.h>          //I2C Comms with Accelerometer Unit
-#include <MPU60X0_6Axis_MotionApps20.h>
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //DEFINITIONS
@@ -38,6 +33,7 @@
 #define TOUCH_MAX_X 900       //The Maximum X Value Outputted by the Touch Screen
 #define TOUCH_MIN_Y 70        //The Minimum Y Value Outputted by the Touch Screen
 #define TOUCH_MAX_Y 920       //The Maximum Y Value Outputted by the Touch Screen
+#define TOUCH_ENABLE_PIN 13   
 
 //TFT LCD
 //TFT LCD Pins
@@ -53,6 +49,8 @@
 //SD CARD READER
 //SD Card Pins
 #define SD_CS 10  //The SD Card Reader Chip Select Pin
+
+//ACCELEROMETER
 
 //COLOURS
 //Colour Value Definitions
@@ -70,6 +68,18 @@
 #define BMP_WIDTH 240    //BMP Image Width
 
 //GUI
+//Menu Parameters
+#define NUMERICAL_BUTTON_YMIN 0
+#define NUMERICAL_BUTTON_YMAX 80
+#define GRAPH_BUTTON_YMIN 81
+#define GRAPH_BUTTON_YMAX 160
+#define HIST_BUTTON_YMIN 161
+#define HIST_BUTTON_YMAX 240
+#define SET_BUTTON_YMIN 241
+#define SET_BUTTON_YMAX 320
+#define MENU_BUTTON_XMIN 0
+#define MENU_BUTTON_XMAX 30
+
 //Numerical Acceleration Screen Parameters
 #define AXIAL_X_COORD_NAS 20
 #define AXIAL_Y_COORD_NAS 79
@@ -84,62 +94,129 @@
 //GUI
 //GUI File Names
 char* gui_file_names[4] = {"NAS.bmp", "GAS.bmp", "HIST.bmp", "SET.bmp"};   //The names of the GUI BMP Files
+char boot_bmp_name[] = "BOOT.bmp";
+
+//GUI Tracking Variables
+int screen_index = 0;
+bool background_drawn = false;
+
+//TOUCHSCREEEN
+//Touchscreen Tracking Variables
+int x_coord = 0, y_coord = 0;
 
 //BMP FILES
 //BMP File Parameters
 unsigned char bmp_data_offset = 0;  //The offset between the start of the BMP File and the RGB Data
 
+//ACCELEROMETER
+//Acceleration Values
+float accel_vals[3];
+
+//DATA
+//Data File Names
+String data_file_name = "DT.txt";   //File containing all time maximum acceleration data
+
+//Data Storage Variables
+float all_time_max_accel[3] = {0, 0, 0};
+float session_max_accel[3] = {0, 0, 0};
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //OBJECTS
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-//Touch Screen Object
-TouchScreen touch = TouchScreen(XP, YP, XM, YM, TOUCH_RESISTANCE);
-
 //TFT LCD Object
 Elegoo_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
+
+//Touch Screen Object
+TouchScreen touch = TouchScreen(XP, YP, XM, YM, TOUCH_RESISTANCE);
+TSPoint touch_point;
+
+//SD Object
+File file;
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //FUNCTIONS
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //SD CARD FUNCTIONS
+//Setup the SD Card Reader
+void setup_SD(void){
+  //Initializing SD Card Communications
+  if (!SD.begin(SD_CS)){
+    //Informing User of SD Card Initialization Failure
+    tft.fillScreen(BLACK);
+    tft.setCursor(0, 0);
+    tft.setTextColor(WHITE);
+    tft.setTextSize(2);
+    tft.println("Failed to Initialize\nSD Card");
+  }
+}
+
 //Read the next 16 Bit Word from the File and convert it to Little Endian
-uint16_t read16(File f)
+uint16_t read16(void)
 {
     uint16_t d;
     uint8_t b;
-    b = f.read();
-    d = f.read();
+    b = file.read();
+    d = file.read();
     d <<= 8;
     d |= b;
     return d;
 }
 
 //Read the next 32 Bit Word from the File and convert it to Little Endian
-uint32_t read32(File f)
+uint32_t read32(void)
 {
     uint32_t d;
     uint16_t b;
-    b = read16(f);
-    d = read16(f);
+    b = read16();
+    d = read16();
     d <<= 16;
     d |= b;
     return d;
 }
 
+//Get the next line from a text file on the SD Card
+String read_text_line(void){
+  String text = "";
+  char current_byte = 0;
+  while(current_byte != '\r'){
+    current_byte = file.read();
+    if(current_byte != '\r'){
+      text += current_byte;
+    }
+  }
+  return(text);
+}
+
+//Get the all time maximum accelerations from the Data File
+void get_all_time_max_accel(void){
+  String accel_val_string = "";
+  file = SD.open(data_file_name);   //Opening the All Time Maximum Acceleration Data File
+  for(int index = 0; index < 3; index++){
+    accel_val_string = read_text_line();
+    all_time_max_accel[index] = accel_val_string.toFloat();
+  }
+  file.close();
+}
+
 //Get the RGB Data offset value from the BMP File
-void get_bmp_rgb_data_offset(File bmpFile) 
-{ 
-    bmpFile.seek(10); //Seeking to the RGB Data offset value
-    bmp_data_offset = read32(bmpFile);
+void get_bmp_rgb_data_offset(void){ 
+    file.seek(10); //Seeking to the RGB Data offset value
+    bmp_data_offset = read32();
 }
 
 //TFT LCD FUNCTIONS
+//Setup the TFT LCD
+void setup_tft(void){
+  tft.reset();  //Resetting the LCD Display
+  tft.begin(TFT_IDENTIFIER);  //Beginning Communications with the TFT LCD Driver Chip
+}
+
 //Write a BMP Image to the TFT LCD Display
-void bmp_draw(File bmpFile){
+void bmp_draw(void){
     uint8_t bmp_buff[BUFFPIXEL * 3]; //Buffer to store RGB Data
 
-    get_bmp_rgb_data_offset(bmpFile);
-    bmpFile.seek(bmp_data_offset);  //Seeking to RGB Data Start in BMP File
+    get_bmp_rgb_data_offset();
+    file.seek(bmp_data_offset);  //Seeking to RGB Data Start in BMP File
     
     //For all columns of the Image
     for (int column = 0; column < BMP_HEIGHT; column++) {
@@ -149,7 +226,7 @@ void bmp_draw(File bmpFile){
             int offset_x = rgb_data_chunk * BUFFPIXEL;  //Current Data Chunk Offset along Screen Width in Pixels
             unsigned int color[BUFFPIXEL];
             
-            bmpFile.read(bmp_buff, BUFFPIXEL * 3);
+            file.read(bmp_buff, BUFFPIXEL * 3);
             
             for(int row = 0; row < BUFFPIXEL; row++) {
                 color[row] = bmp_buff[buff_index + 2] >> 3;                      //Red Colour Data
@@ -172,10 +249,57 @@ void text_draw(char* text, int colour, int x, int y){
   tft.setRotation(0);
 }
 
-//TEST FUNCTIONS
-//Generate a random floating point number
-float gen_rand_num(){
-  return (random(-500, 500) / 100.0);
+//TOUCHSCREEN FUNCTIONS
+//Setup Touch Screen
+void setup_touch(void){
+  pinMode(TOUCH_ENABLE_PIN, OUTPUT);
+}
+
+//Get the latest coordinates from the Touch Screen
+void get_touch_point(void){
+  digitalWrite(TOUCH_ENABLE_PIN, HIGH);
+  touch_point = touch.getPoint();
+  digitalWrite(TOUCH_ENABLE_PIN, LOW);
+  touch_point.x = map(touch_point.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, tft.width());   //Mapping the X Value to Pixel Based Coordinates
+  touch_point.y = map(touch_point.y, TOUCH_MIN_Y, TOUCH_MAX_Y, 0, tft.height());  //Mapping the Y Value to Pixel Based Coordinates
+  pinMode(XM, OUTPUT);  //Setting Pins as Output to ensure the LCD can function correctly
+  pinMode(YP, OUTPUT);
+}
+
+//ACCELEROMETER FUNCTIONS
+//Get the latest acceleration values - IMPLEMENT WITH ACTUAL CODE WHEN ACCELEROMETER READY
+void get_accel_vals(void){
+  for(int index = 0; index < 3; index++){
+    accel_vals[index] = get_rand_float();
+  }
+}
+
+//GUI FUNCTIONS
+//Decode a Touch Screen Coordinate Input into the corresponding button press
+void get_menu_button_press(void){
+  if(touch_point.x > 0){   //Ensuring that the touch pressure is great enough to avoid registering noise as a press
+    if(touch_point.x > MENU_BUTTON_XMIN && touch_point.x < MENU_BUTTON_XMAX){   //Ensuring that a button on the menu has been pressed
+      if(touch_point.y > NUMERICAL_BUTTON_YMIN && touch_point.y < NUMERICAL_BUTTON_YMAX){
+        screen_index = 0;
+      }
+      else if(touch_point.y > GRAPH_BUTTON_YMIN && touch_point.y < GRAPH_BUTTON_YMAX){
+        screen_index = 1;
+      }
+      else if(touch_point.y > HIST_BUTTON_YMIN && touch_point.y < HIST_BUTTON_YMAX){
+        screen_index = 2;
+      }
+      else if(touch_point.y > SET_BUTTON_YMIN && touch_point.y < SET_BUTTON_YMAX){
+        screen_index = 3;
+      }
+      background_drawn = false;
+    }
+  }
+}
+
+//TEST FUNCTIONS - COMMENT THIS SECTION OUT WHEN NOT IN USE
+float get_rand_float(void){
+  float random_float = random(-500, 500) / 100.0;
+  return random_float;
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -184,27 +308,47 @@ float gen_rand_num(){
 void setup(){
   //Beginning Serial Communications for Debugging
   Serial.begin(9600);
-  
+
   //TFT LCD Setup
-  tft.reset();  //Resetting the LCD Display
-  tft.begin(TFT_IDENTIFIER);  //Beginning Communications with the TFT LCD Driver Chip
+  setup_tft();
+
+  //Touch Screen Setup
+  setup_touch();
 
   //SD Card Reader Setup
-  //Initializing SD Card Communications
-  if (!SD.begin(SD_CS)){
-    //Informing User of SD Card Initialization Failure
-    tft.fillScreen(BLACK);
-    tft.setCursor(0, 0);
-    tft.setTextColor(WHITE);
-    tft.setTextSize(2);
-    tft.println("Failed to Initialize\nSD Card");
-  }
+  setup_SD();
+
+  //Drawing the Boot Screen
+  file = SD.open(boot_bmp_name);
+  bmp_draw();
+  file.close();
+
+  //Getting All Time Maximum Data
+  get_all_time_max_accel();
+
+  //Pause for Boot Effect
+  delay(2000);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //MAIN LOOP
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void loop(){
+  //Getting the Current Acceleration Values
+  get_accel_vals();
   
+  //Getting the Current Touchscreen Values
+  get_touch_point();
+  
+  //Registering a Menu Button Press
+  get_menu_button_press();
+  
+  //Ensuring the Screen Background is Drawn
+  if(background_drawn == false){
+    file = SD.open(gui_file_names[screen_index]);
+    bmp_draw();
+    file.close();
+    background_drawn = true;
+  }
 }
 

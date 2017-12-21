@@ -17,7 +17,7 @@
 // **** IF USING THE LCD BREAKOUT BOARD, COMMENT OUT THIS NEXT LINE. ****
 // **** IF USING THE LCD SHIELD, LEAVE THE LINE ENABLED:             ****
 
-//#define USE_Elegoo_SHIELD_PINOUT 1
+#define USE_Elegoo_SHIELD_PINOUT 1
 
 class Elegoo_TFTLCD : public Elegoo_GFX {
 
