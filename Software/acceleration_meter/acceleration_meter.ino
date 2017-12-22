@@ -88,6 +88,9 @@
 #define VERTICAL_X_COORD_NAS 20
 #define VERTICAL_Y_COORD_NAS 193
 
+//Timing Parameters
+#define DELAY_TIME 500  //The time between screen refreshes in milliseconds
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //VARIABLES
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -97,8 +100,13 @@ char* gui_file_names[4] = {"NAS.bmp", "GAS.bmp", "HIST.bmp", "SET.bmp"};   //The
 char boot_bmp_name[] = "BOOT.bmp";
 
 //GUI Tracking Variables
+//Screen Parameters
 int screen_index = 0;
 bool background_drawn = false;
+
+//Timing Parameters
+unsigned long start_time;
+unsigned long current_time;
 
 //TOUCHSCREEEN
 //Touchscreen Tracking Variables
@@ -110,6 +118,7 @@ unsigned char bmp_data_offset = 0;  //The offset between the start of the BMP Fi
 
 //ACCELEROMETER
 //Acceleration Values
+float last_accel_vals[3];
 float accel_vals[3];
 
 //DATA
@@ -270,6 +279,7 @@ void get_touch_point(void){
 //Get the latest acceleration values - IMPLEMENT WITH ACTUAL CODE WHEN ACCELEROMETER READY
 void get_accel_vals(void){
   for(int index = 0; index < 3; index++){
+    last_accel_vals[index] = accel_vals[index];
     accel_vals[index] = get_rand_float();
   }
 }
@@ -294,6 +304,27 @@ void get_menu_button_press(void){
       background_drawn = false;
     }
   }
+}
+
+//Numerical Acceleration Screen Update Function
+void update_NAS_screen(void){
+  char accel_str[10];
+
+  //Clearing the currently displayed acceleration values
+  dtostrf(last_accel_vals[0], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, AXIAL_X_COORD_NAS, AXIAL_Y_COORD_NAS);
+  dtostrf(last_accel_vals[1], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, LATERAL_X_COORD_NAS, LATERAL_Y_COORD_NAS);
+  dtostrf(last_accel_vals[2], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, VERTICAL_X_COORD_NAS, VERTICAL_Y_COORD_NAS);
+
+  //Displaying the new acceleration values
+  dtostrf(accel_vals[0], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, AXIAL_X_COORD_NAS, AXIAL_Y_COORD_NAS);
+  dtostrf(accel_vals[1], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, LATERAL_X_COORD_NAS, LATERAL_Y_COORD_NAS);
+  dtostrf(accel_vals[2], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, VERTICAL_X_COORD_NAS, VERTICAL_Y_COORD_NAS);
 }
 
 //TEST FUNCTIONS - COMMENT THIS SECTION OUT WHEN NOT IN USE
@@ -328,14 +359,23 @@ void setup(){
 
   //Pause for Boot Effect
   delay(2000);
+
+  //Getting the Main Loop Start Time
+  start_time = millis();
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //MAIN LOOP
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void loop(){
-  //Getting the Current Acceleration Values
-  get_accel_vals();
+  //Getting the Current Time
+  current_time = millis();
+
+  //Ensuring that the Timing Variable has not overflowed
+  if(current_time < start_time){
+    start_time = millis();
+    current_time = millis();
+  }
   
   //Getting the Current Touchscreen Values
   get_touch_point();
@@ -349,6 +389,24 @@ void loop(){
     bmp_draw();
     file.close();
     background_drawn = true;
+  }
+  
+  //If the delay time has passed
+  if(current_time - start_time > DELAY_TIME){
+    //Getting the Current Acceleration Values
+    get_accel_vals();
+
+    //Refreshing the Current Screen
+    switch(screen_index){
+      case 0:   //The index for the Numerical Acceleration Screen
+        update_NAS_screen();
+        break;
+      default:
+        break;
+    }
+
+    //Updating the timing loop
+    start_time = millis();
   }
 }
 
