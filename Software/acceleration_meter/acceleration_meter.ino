@@ -16,6 +16,7 @@
 #include <TouchScreen.h>      //Touch Screen Hardware Specific Library
 #include <SD.h>               //SD Card Library
 #include <SPI.h>              //Serial Peripheral Interface (SPI) Library
+#include <MemoryFree.h>
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //DEFINITIONS
@@ -63,7 +64,7 @@
 
 //BMP FILES
 //BMP File Parameters
-#define BUFFPIXEL 240  //The size of the buffer used to store BMP File data
+#define BUFFPIXEL 80  //The size of the buffer used to store BMP File data
 #define BMP_HEIGHT 320   //BMP Image Height
 #define BMP_WIDTH 240    //BMP Image Width
 
@@ -88,6 +89,15 @@
 #define VERTICAL_X_COORD_NAS 20
 #define VERTICAL_Y_COORD_NAS 193
 
+//Graphical Acceleration Screen Parameters
+#define GRAPH_BOX_XMIN 28
+#define GRAPH_BOX_XMAX 313
+#define GRAPH_BOX_YMIN 40
+#define GRAPH_BOX_YMAX 232
+#define GRAPH_NUM_POINTS 20
+#define GRAPH_MAX_ACCEL 5
+#define GRAPH_MIN_ACCEL -5
+
 //Timing Parameters
 #define DELAY_TIME 500  //The time between screen refreshes in milliseconds
 
@@ -96,8 +106,8 @@
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //GUI
 //GUI File Names
-char* gui_file_names[4] = {"NAS.bmp", "GAS.bmp", "HIST.bmp", "SET.bmp"};   //The names of the GUI BMP Files
-char boot_bmp_name[] = "BOOT.bmp";
+const char* const gui_file_names[] = {"NAS.bmp", "GAS.bmp", "HIST.bmp", "SET.bmp"};   //The names of the GUI BMP Files
+const char boot_bmp_name[] = "BOOT.bmp";
 
 //GUI Tracking Variables
 //Screen Parameters
@@ -118,12 +128,12 @@ unsigned char bmp_data_offset = 0;  //The offset between the start of the BMP Fi
 
 //ACCELEROMETER
 //Acceleration Values
-float last_accel_vals[3];
-float accel_vals[3];
+float last_accel_vals[3] = {0.0, 0.0, 0.0}, accel_vals[3] = {0.0, 0.0, 0.0};
+float graph_axial_accel_vals[GRAPH_NUM_POINTS], graph_lateral_accel_vals[GRAPH_NUM_POINTS], graph_vertical_accel_vals[GRAPH_NUM_POINTS];
 
 //DATA
 //Data File Names
-String data_file_name = "DT.txt";   //File containing all time maximum acceleration data
+const char data_file_name[] = "DT.txt";   //File containing all time maximum acceleration data
 
 //Data Storage Variables
 float all_time_max_accel[3] = {0, 0, 0};
@@ -160,8 +170,7 @@ void setup_SD(void){
 }
 
 //Read the next 16 Bit Word from the File and convert it to Little Endian
-uint16_t read16(void)
-{
+uint16_t read16(void){
     uint16_t d;
     uint8_t b;
     b = file.read();
@@ -172,8 +181,7 @@ uint16_t read16(void)
 }
 
 //Read the next 32 Bit Word from the File and convert it to Little Endian
-uint32_t read32(void)
-{
+uint32_t read32(void){
     uint32_t d;
     uint16_t b;
     b = read16();
@@ -254,8 +262,26 @@ void text_draw(char* text, int colour, int x, int y){
   tft.setCursor(x, y);
   tft.setTextColor(colour);
   tft.setTextSize(2);
-  tft.println(text);
+  tft.print(text);
   tft.setRotation(0);
+}
+
+//Add lines to the Graphical Acceleration Screen Graph
+void draw_graph_lines(float* accel_vals, int colour){
+  int x1_coord, x2_coord, y1_coord, y2_coord;
+
+  tft.setRotation(135);   //Setting screen coordinates to landscape
+  
+  //For all acceleration points
+  for(int index = 1; index < GRAPH_NUM_POINTS; index++){
+    x1_coord = ((GRAPH_BOX_XMAX - GRAPH_BOX_XMIN) / GRAPH_NUM_POINTS) * (index - 1) + GRAPH_BOX_XMIN;
+    y1_coord = map(accel_vals[index - 1], GRAPH_MIN_ACCEL, GRAPH_MAX_ACCEL, GRAPH_BOX_YMIN, GRAPH_BOX_YMAX);
+    x2_coord = ((GRAPH_BOX_XMAX - GRAPH_BOX_XMIN) / GRAPH_NUM_POINTS) * index + GRAPH_BOX_XMIN;
+    y2_coord = map(accel_vals[index], GRAPH_MIN_ACCEL, GRAPH_MAX_ACCEL, GRAPH_BOX_YMIN, GRAPH_BOX_YMAX);
+    tft.drawLine(x1_coord, y1_coord, x2_coord, y2_coord, colour);
+  }
+
+  tft.setRotation(0);   //Setting screen coordinates to portrait
 }
 
 //TOUCHSCREEN FUNCTIONS
@@ -282,6 +308,14 @@ void get_accel_vals(void){
     last_accel_vals[index] = accel_vals[index];
     accel_vals[index] = get_rand_float();
   }
+}
+
+//Shift stored acceleration values along in an array and add the latest values to the end of the array
+void shift_accel_vals(float *accel_vals, float latest_accel_val){
+  for(int index = 0; index < GRAPH_NUM_POINTS - 1; index++){
+    accel_vals[index] = accel_vals[index + 1];
+  }
+  accel_vals[GRAPH_NUM_POINTS - 1] = latest_accel_val;
 }
 
 //GUI FUNCTIONS
@@ -327,6 +361,22 @@ void update_NAS_screen(void){
   text_draw(accel_str, BLACK, VERTICAL_X_COORD_NAS, VERTICAL_Y_COORD_NAS);
 }
 
+//Graphical Acceleration Screen Update Function
+void update_GAS_screen(void){
+  draw_graph_lines(graph_axial_accel_vals, WHITE);  //Clearing the Axial Acceleration Lines
+  draw_graph_lines(graph_lateral_accel_vals, WHITE);  //Clearing the Lateral Acceleration Lines
+  draw_graph_lines(graph_vertical_accel_vals, WHITE); //Clearing the Vertical Acceleration Lines
+
+  //Shifting acceleration data along array to add new acceleration point
+  shift_accel_vals(graph_axial_accel_vals, accel_vals[0]);
+  shift_accel_vals(graph_lateral_accel_vals, accel_vals[1]);
+  shift_accel_vals(graph_vertical_accel_vals, accel_vals[2]);
+
+  draw_graph_lines(graph_axial_accel_vals, RED);  //Drawing new Axial Acceleration Lines
+  draw_graph_lines(graph_lateral_accel_vals, GREEN);  //Drawing new Lateral Acceleration Lines
+  draw_graph_lines(graph_vertical_accel_vals, BLUE);  //Drawing new Vertical Acceleration Lines
+}
+
 //TEST FUNCTIONS - COMMENT THIS SECTION OUT WHEN NOT IN USE
 float get_rand_float(void){
   float random_float = random(-500, 500) / 100.0;
@@ -370,7 +420,7 @@ void setup(){
 void loop(){
   //Getting the Current Time
   current_time = millis();
-
+  
   //Ensuring that the Timing Variable has not overflowed
   if(current_time < start_time){
     start_time = millis();
@@ -401,6 +451,11 @@ void loop(){
       case 0:   //The index for the Numerical Acceleration Screen
         update_NAS_screen();
         break;
+
+      case 1:   //The index for the Graphical Acceleration Screen
+        update_GAS_screen();
+        break;
+      
       default:
         break;
     }
