@@ -16,7 +16,6 @@
 #include <TouchScreen.h>      //Touch Screen Hardware Specific Library
 #include <SD.h>               //SD Card Library
 #include <SPI.h>              //Serial Peripheral Interface (SPI) Library
-#include <MemoryFree.h>
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //DEFINITIONS
@@ -64,7 +63,7 @@
 
 //BMP FILES
 //BMP File Parameters
-#define BUFFPIXEL 80  //The size of the buffer used to store BMP File data
+#define BUFFPIXEL 60  //The size of the buffer used to store BMP File data
 #define BMP_HEIGHT 320   //BMP Image Height
 #define BMP_WIDTH 240    //BMP Image Width
 
@@ -97,6 +96,20 @@
 #define GRAPH_NUM_POINTS 20
 #define GRAPH_MAX_ACCEL 5
 #define GRAPH_MIN_ACCEL -5
+
+//History Data Screen Parameters
+#define SESSION_AXIAL_XCOORD 105
+#define SESSION_AXIAL_YCOORD 68
+#define SESSION_LATERAL_XCOORD 105
+#define SESSION_LATERAL_YCOORD 107
+#define SESSION_VERTICAL_XCOORD 215
+#define SESSION_VERTICAL_YCOORD 107
+#define ALLTIME_AXIAL_XCOORD 105
+#define ALLTIME_AXIAL_YCOORD 173
+#define ALLTIME_LATERAL_XCOORD 105
+#define ALLTIME_LATERAL_YCOORD 211
+#define ALLTIME_VERTICAL_XCOORD 215
+#define ALLTIME_VERTICAL_YCOORD 211
 
 //Timing Parameters
 #define DELAY_TIME 500  //The time between screen refreshes in milliseconds
@@ -136,8 +149,8 @@ float graph_axial_accel_vals[GRAPH_NUM_POINTS], graph_lateral_accel_vals[GRAPH_N
 const char data_file_name[] = "DT.txt";   //File containing all time maximum acceleration data
 
 //Data Storage Variables
-float all_time_max_accel[3] = {0, 0, 0};
-float session_max_accel[3] = {0, 0, 0};
+float all_time_max_accel[3] = {0.0, 0.0, 0.0}, last_all_time_max_accel[3] = {0.0, 0.0, 0.0};
+float session_max_accel[3] = {0.0, 0.0, 0.0}, last_session_max_accel[3] = {0.0, 0.0, 0.0};
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //OBJECTS
@@ -166,6 +179,7 @@ void setup_SD(void){
     tft.setTextColor(WHITE);
     tft.setTextSize(2);
     tft.println("Failed to Initialize\nSD Card");
+    while(1);
   }
 }
 
@@ -212,6 +226,20 @@ void get_all_time_max_accel(void){
     accel_val_string = read_text_line();
     all_time_max_accel[index] = accel_val_string.toFloat();
   }
+  file.close();
+}
+
+//Set the all time maximum accelerations in the Data File
+void set_all_time_max_accel(void){
+  char accel_val_string[] = "";
+  String file_output = "";
+  SD.remove(data_file_name);
+  file = SD.open(data_file_name, FILE_WRITE);   //Opening the All Time Maximum Acceleration Data File
+  for(int index = 0; index < 3; index++){
+    dtostrf(all_time_max_accel[index], 5, 3, accel_val_string);
+    file_output = file_output + String(accel_val_string) + "\r\n";
+  }
+  file.println(file_output);   //Writing the new all time maximum acceleration values into the Data File
   file.close();
 }
 
@@ -318,6 +346,27 @@ void shift_accel_vals(float *accel_vals, float latest_accel_val){
   accel_vals[GRAPH_NUM_POINTS - 1] = latest_accel_val;
 }
 
+//Update the session maximum acceleration values
+void update_session_maximum(void){
+  for(int index = 0; index < 3; index++){
+    if(abs(accel_vals[index]) > abs(session_max_accel[index])){
+      last_session_max_accel[index] = session_max_accel[index];
+      session_max_accel[index] = accel_vals[index];   //Updating RAM stored value of the Session Maximum Acceleration Value
+    }
+  }
+}
+
+//Update the all time maximum acceleration values
+void update_all_time_maximum(void){
+  for(int index = 0; index < 3; index++){
+    if(abs(accel_vals[index]) > abs(all_time_max_accel[index])){
+      last_all_time_max_accel[index] = all_time_max_accel[index];
+      all_time_max_accel[index] = accel_vals[index];  //Updating RAM stored value of the All Time Maximum Acceleration Value
+    }
+  }
+  set_all_time_max_accel();
+}
+
 //GUI FUNCTIONS
 //Decode a Touch Screen Coordinate Input into the corresponding button press
 void get_menu_button_press(void){
@@ -342,7 +391,7 @@ void get_menu_button_press(void){
 
 //Numerical Acceleration Screen Update Function
 void update_NAS_screen(void){
-  char accel_str[10];
+  char accel_str[5];
 
   //Clearing the currently displayed acceleration values
   dtostrf(last_accel_vals[0], 5, 3, accel_str);
@@ -377,6 +426,67 @@ void update_GAS_screen(void){
   draw_graph_lines(graph_vertical_accel_vals, BLUE);  //Drawing new Vertical Acceleration Lines
 }
 
+//History Screen Update Function
+void update_HIST_screen(void){
+  bool update_screen = false;
+
+  //Checking if any of the maximum acceleration values have changed
+  for(int index = 0; index < 3; index++){
+    Serial.print("Current Session Accel ");
+    Serial.print(index);
+    Serial.print(" ");
+    Serial.println(session_max_accel[index]);
+    Serial.print("Last Session Accel ");
+    Serial.print(index);
+    Serial.print(" ");
+    Serial.println(last_session_max_accel[index]);
+    if(all_time_max_accel[index] > last_all_time_max_accel[index] or session_max_accel[index] > last_session_max_accel[index]){
+      update_screen = true;
+    }
+  }
+  if(update_screen == true){
+    update_HIST_screen_vals();
+  }
+}
+
+//Function to update the History Screen Values
+void update_HIST_screen_vals(void){
+  char accel_str[5];
+  
+  //Clearing the currently displayed acceleration values - SESSION MAXIMUM
+  dtostrf(last_session_max_accel[0], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, SESSION_AXIAL_XCOORD, SESSION_AXIAL_YCOORD);
+  dtostrf(last_session_max_accel[1], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, SESSION_LATERAL_XCOORD, SESSION_LATERAL_YCOORD);
+  dtostrf(last_session_max_accel[2], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, SESSION_VERTICAL_XCOORD, SESSION_VERTICAL_YCOORD);
+
+  //Clearing the currently displayed acceleration values - ALL TIME MAXIMUM
+  dtostrf(last_all_time_max_accel[0], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, ALLTIME_AXIAL_XCOORD, ALLTIME_AXIAL_YCOORD);
+  dtostrf(last_all_time_max_accel[1], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, ALLTIME_LATERAL_XCOORD, ALLTIME_LATERAL_YCOORD);
+  dtostrf(last_all_time_max_accel[2], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
+
+  //Displaying New Acceleration Values - SESSION MAXIMUM
+  dtostrf(session_max_accel[0], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, SESSION_AXIAL_XCOORD, SESSION_AXIAL_YCOORD);
+  dtostrf(session_max_accel[1], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, SESSION_LATERAL_XCOORD, SESSION_LATERAL_YCOORD);
+  dtostrf(session_max_accel[2], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, SESSION_VERTICAL_XCOORD, SESSION_VERTICAL_YCOORD);
+
+  //Displaying New Acceleration Values - ALL TIME MAXIMUM
+  dtostrf(all_time_max_accel[0], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, ALLTIME_AXIAL_XCOORD, ALLTIME_AXIAL_YCOORD);
+  dtostrf(all_time_max_accel[1], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, ALLTIME_LATERAL_XCOORD, ALLTIME_LATERAL_YCOORD);
+  dtostrf(all_time_max_accel[2], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
+}
+
+  
 //TEST FUNCTIONS - COMMENT THIS SECTION OUT WHEN NOT IN USE
 float get_rand_float(void){
   float random_float = random(-500, 500) / 100.0;
@@ -392,6 +502,9 @@ void setup(){
 
   //TFT LCD Setup
   setup_tft();
+
+  //Filling Screen with Black to remove flicker
+  tft.fillScreen(BLACK);
 
   //Touch Screen Setup
   setup_touch();
@@ -446,6 +559,12 @@ void loop(){
     //Getting the Current Acceleration Values
     get_accel_vals();
 
+    //Updating the Session Maximum Values
+    update_session_maximum();
+
+    //Updating the All Time Maximum Values
+    update_all_time_maximum();
+
     //Refreshing the Current Screen
     switch(screen_index){
       case 0:   //The index for the Numerical Acceleration Screen
@@ -454,6 +573,10 @@ void loop(){
 
       case 1:   //The index for the Graphical Acceleration Screen
         update_GAS_screen();
+        break;
+
+      case 2:   //The index for the History Screen
+        update_HIST_screen();
         break;
       
       default:
