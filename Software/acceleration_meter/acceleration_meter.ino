@@ -16,6 +16,7 @@
 #include <TouchScreen.h>      //Touch Screen Hardware Specific Library
 #include <SD.h>               //SD Card Library
 #include <SPI.h>              //Serial Peripheral Interface (SPI) Library
+#include <SparkFun_ADXL345.h>   //Accelerometer Library
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //DEFINITIONS
@@ -51,6 +52,10 @@
 #define SD_CS 10  //The SD Card Reader Chip Select Pin
 
 //ACCELEROMETER
+#define ACCEL_CS A5   //The Accelerometer Chip Select Pin
+#define X_AXIS_GAIN 0.00376390
+#define Y_AXIS_GAIN 0.00376009
+#define Z_AXIS_GAIN 0.00349265
 
 //COLOURS
 //Colour Value Definitions
@@ -165,6 +170,9 @@ TSPoint touch_point;
 //SD Object
 File file;
 
+//Accelerometer Object
+ADXL345 adxl = ADXL345(ACCEL_CS);
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //FUNCTIONS
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -180,6 +188,9 @@ void setup_SD(void){
     tft.setTextSize(2);
     tft.println("Failed to Initialize\nSD Card");
     while(1);
+  }
+  else{
+    SPI.setDataMode(SPI_MODE3);   //Resetting the SPI Mode to ensure communication with the Accelerometer
   }
 }
 
@@ -330,12 +341,26 @@ void get_touch_point(void){
 }
 
 //ACCELEROMETER FUNCTIONS
+//Setup the Accelerometer
+void setup_accel(void){
+  adxl.powerOn();
+  adxl.setRangeSetting(8);
+  adxl.setSpiBit(0);
+}
+
 //Get the latest acceleration values - IMPLEMENT WITH ACTUAL CODE WHEN ACCELEROMETER READY
 void get_accel_vals(void){
+  int x, y, z;
+  SPI.setDataMode(SPI_MODE3);
+
   for(int index = 0; index < 3; index++){
     last_accel_vals[index] = accel_vals[index];
-    accel_vals[index] = get_rand_float();
   }
+  
+  adxl.readAccel(&x, &y, &z);
+  accel_vals[0] = x * X_AXIS_GAIN;
+  accel_vals[1] = y * Y_AXIS_GAIN;
+  accel_vals[2] = z * Z_AXIS_GAIN;
 }
 
 //Shift stored acceleration values along in an array and add the latest values to the end of the array
@@ -486,7 +511,6 @@ void update_HIST_screen_vals(void){
   text_draw(accel_str, BLACK, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
 }
 
-  
 //TEST FUNCTIONS - COMMENT THIS SECTION OUT WHEN NOT IN USE
 float get_rand_float(void){
   float random_float = random(-500, 500) / 100.0;
@@ -508,6 +532,9 @@ void setup(){
 
   //Touch Screen Setup
   setup_touch();
+
+  //Accelerometer Setup
+  setup_accel();
 
   //SD Card Reader Setup
   setup_SD();
