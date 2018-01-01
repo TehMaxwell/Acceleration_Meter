@@ -1,4 +1,4 @@
-/*
+ /*
  * This is the main software for the Acceleration Meter. This device is designed to measure the acceleration of an object using an accelerometer and gyroscope.
  * Acceleration results are outputed on a TFT LCD with fuller colour graphics, a touch screen user interface is provided to switch between screens.
  * Users can either view the acceleration results as individual numbers, or as a graph. Session results can be saved, and all time maximum results can also be viewed.
@@ -53,9 +53,10 @@
 
 //ACCELEROMETER
 #define ACCEL_CS A5   //The Accelerometer Chip Select Pin
-#define X_AXIS_GAIN 0.00376390
-#define Y_AXIS_GAIN 0.00376009
-#define Z_AXIS_GAIN 0.00349265
+#define X_AXIS_GAIN 0.0156
+#define Y_AXIS_GAIN 0.0156
+#define Z_AXIS_GAIN 0.0156
+#define VERTICAL_OFFSET 1.0
 
 //COLOURS
 //Colour Value Definitions
@@ -117,7 +118,7 @@
 #define ALLTIME_VERTICAL_YCOORD 211
 
 //Timing Parameters
-#define DELAY_TIME 500  //The time between screen refreshes in milliseconds
+#define DELAY_TIME 200  //The time between screen refreshes in milliseconds
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //VARIABLES
@@ -314,9 +315,9 @@ void draw_graph_lines(float* accel_vals, int colour){
   //For all acceleration points
   for(int index = 1; index < GRAPH_NUM_POINTS; index++){
     x1_coord = ((GRAPH_BOX_XMAX - GRAPH_BOX_XMIN) / GRAPH_NUM_POINTS) * (index - 1) + GRAPH_BOX_XMIN;
-    y1_coord = map(accel_vals[index - 1], GRAPH_MIN_ACCEL, GRAPH_MAX_ACCEL, GRAPH_BOX_YMIN, GRAPH_BOX_YMAX);
+    y1_coord = map(int(accel_vals[index - 1] * 1000), GRAPH_MIN_ACCEL * 1000, GRAPH_MAX_ACCEL * 1000, GRAPH_BOX_YMIN, GRAPH_BOX_YMAX);
     x2_coord = ((GRAPH_BOX_XMAX - GRAPH_BOX_XMIN) / GRAPH_NUM_POINTS) * index + GRAPH_BOX_XMIN;
-    y2_coord = map(accel_vals[index], GRAPH_MIN_ACCEL, GRAPH_MAX_ACCEL, GRAPH_BOX_YMIN, GRAPH_BOX_YMAX);
+    y2_coord = map(int(accel_vals[index] * 1000), GRAPH_MIN_ACCEL * 1000, GRAPH_MAX_ACCEL * 1000, GRAPH_BOX_YMIN, GRAPH_BOX_YMAX);
     tft.drawLine(x1_coord, y1_coord, x2_coord, y2_coord, colour);
   }
 
@@ -358,9 +359,9 @@ void get_accel_vals(void){
   }
   
   adxl.readAccel(&x, &y, &z);
-  accel_vals[0] = x * X_AXIS_GAIN;
+  accel_vals[0] = z * X_AXIS_GAIN;
   accel_vals[1] = y * Y_AXIS_GAIN;
-  accel_vals[2] = z * Z_AXIS_GAIN;
+  accel_vals[2] = VERTICAL_OFFSET + (x * Z_AXIS_GAIN);
 }
 
 //Shift stored acceleration values along in an array and add the latest values to the end of the array
@@ -457,6 +458,7 @@ void update_HIST_screen(void){
 
   //Checking if any of the maximum acceleration values have changed
   for(int index = 0; index < 3; index++){
+    /*
     Serial.print("Current Session Accel ");
     Serial.print(index);
     Serial.print(" ");
@@ -465,6 +467,7 @@ void update_HIST_screen(void){
     Serial.print(index);
     Serial.print(" ");
     Serial.println(last_session_max_accel[index]);
+    */
     if(all_time_max_accel[index] > last_all_time_max_accel[index] or session_max_accel[index] > last_session_max_accel[index]){
       update_screen = true;
     }
@@ -511,11 +514,13 @@ void update_HIST_screen_vals(void){
   text_draw(accel_str, BLACK, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
 }
 
+/*
 //TEST FUNCTIONS - COMMENT THIS SECTION OUT WHEN NOT IN USE
 float get_rand_float(void){
   float random_float = random(-500, 500) / 100.0;
   return random_float;
 }
+*/
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //MAIN SETUP
