@@ -458,22 +458,13 @@ void update_HIST_screen(void){
 
   //Checking if any of the maximum acceleration values have changed
   for(int index = 0; index < 3; index++){
-    /*
-    Serial.print("Current Session Accel ");
-    Serial.print(index);
-    Serial.print(" ");
-    Serial.println(session_max_accel[index]);
-    Serial.print("Last Session Accel ");
-    Serial.print(index);
-    Serial.print(" ");
-    Serial.println(last_session_max_accel[index]);
-    */
-    if(all_time_max_accel[index] > last_all_time_max_accel[index] or session_max_accel[index] > last_session_max_accel[index]){
+    if(session_max_accel[index] > last_session_max_accel[index]){
       update_screen = true;
     }
   }
-  if(update_screen == true){
+  if(update_screen != false){
     update_HIST_screen_vals();
+    update_screen = false;
   }
 }
 
