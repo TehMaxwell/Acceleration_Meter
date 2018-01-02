@@ -4,8 +4,8 @@
  * Users can either view the acceleration results as individual numbers, or as a graph. Session results can be saved, and all time maximum results can also be viewed.
  * 
  * Originially Developed By: Sam Maxwell
- * Release Date: INSERT RELEASE DATE HERE
- * Version Number: INSERT INITIAL VERSION NUMBER HERE
+ * Release Date: 02/01/2018
+ * Version Number: 1.0
  * For more Information on Hardware, Software and Design Files please visit the Github Page for this project located here: https://github.com/TehMaxwell/Acceleration_Meter
  */
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
