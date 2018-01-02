@@ -153,6 +153,7 @@ float graph_axial_accel_vals[GRAPH_NUM_POINTS], graph_lateral_accel_vals[GRAPH_N
 //DATA
 //Data File Names
 const char data_file_name[] = "DT.txt";   //File containing all time maximum acceleration data
+int hist_data_update_counter = 0;
 
 //Data Storage Variables
 float all_time_max_accel[3] = {0.0, 0.0, 0.0}, last_all_time_max_accel[3] = {0.0, 0.0, 0.0};
@@ -390,7 +391,13 @@ void update_all_time_maximum(void){
       all_time_max_accel[index] = accel_vals[index];  //Updating RAM stored value of the All Time Maximum Acceleration Value
     }
   }
-  set_all_time_max_accel();
+
+  hist_data_update_counter += 1;
+  
+  if(hist_data_update_counter > 99){
+    set_all_time_max_accel();
+    hist_data_update_counter = 0;
+  }
 }
 
 //GUI FUNCTIONS
