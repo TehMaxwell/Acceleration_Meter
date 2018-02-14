@@ -53,10 +53,11 @@
 
 //ACCELEROMETER
 #define ACCEL_CS A5   //The Accelerometer Chip Select Pin
-#define X_AXIS_GAIN 0.0156
-#define Y_AXIS_GAIN 0.0156
-#define Z_AXIS_GAIN 0.0156
+#define X_AXIS_GAIN 0.0039
+#define Y_AXIS_GAIN 0.0039
+#define Z_AXIS_GAIN 0.0039
 #define VERTICAL_OFFSET 1.0
+#define ACCEL_RANGE 2
 
 //COLOURS
 //Colour Value Definitions
@@ -81,8 +82,8 @@
 #define GRAPH_BUTTON_YMAX 160
 #define HIST_BUTTON_YMIN 161
 #define HIST_BUTTON_YMAX 240
-#define SET_BUTTON_YMIN 241
-#define SET_BUTTON_YMAX 320
+#define SHUTDOWN_BUTTON_YMIN 241
+#define SHUTDOWN_BUTTON_YMAX 320
 #define MENU_BUTTON_XMIN 0
 #define MENU_BUTTON_XMAX 30
 
@@ -100,8 +101,8 @@
 #define GRAPH_BOX_YMIN 40
 #define GRAPH_BOX_YMAX 232
 #define GRAPH_NUM_POINTS 20
-#define GRAPH_MAX_ACCEL 5
-#define GRAPH_MIN_ACCEL -5
+#define GRAPH_MAX_ACCEL 2
+#define GRAPH_MIN_ACCEL -2
 
 //History Data Screen Parameters
 #define SESSION_AXIAL_XCOORD 105
@@ -116,7 +117,6 @@
 #define ALLTIME_LATERAL_YCOORD 211
 #define ALLTIME_VERTICAL_XCOORD 215
 #define ALLTIME_VERTICAL_YCOORD 211
-#define HIST_SCREEN_UPDATE_NUM 50
 
 //Timing Parameters
 #define DELAY_TIME 200  //The time between screen refreshes in milliseconds
@@ -126,15 +126,13 @@
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //GUI
 //GUI File Names
-const char* const gui_file_names[] = {"NAS.bmp", "GAS.bmp", "HIST.bmp", "SET.bmp"};   //The names of the GUI BMP Files
+const char* const gui_file_names[] = {"NAS.bmp", "GAS.bmp", "HIST.bmp"};   //The names of the GUI BMP Files
 const char boot_bmp_name[] = "BOOT.bmp";
 
 //GUI Tracking Variables
 //Screen Parameters
 int screen_index = 0;
 bool background_drawn = false;
-int hist_screen_update_counter = HIST_SCREEN_UPDATE_NUM - 2;
-float hist_last_all_time_max_accel[3] = {0.0, 0.0, 0.0}, hist_last_session_max_accel[3] = {0.0, 0.0, 0.0};
 
 //Timing Parameters
 unsigned long start_time;
@@ -348,7 +346,7 @@ void get_touch_point(void){
 //Setup the Accelerometer
 void setup_accel(void){
   adxl.powerOn();
-  adxl.setRangeSetting(8);
+  adxl.setRangeSetting(ACCEL_RANGE);
   adxl.setSpiBit(0);
 }
 
@@ -410,7 +408,7 @@ void get_menu_button_press(void){
       else if(touch_point.y > HIST_BUTTON_YMIN && touch_point.y < HIST_BUTTON_YMAX){
         screen_index = 2;
       }
-      else if(touch_point.y > SET_BUTTON_YMIN && touch_point.y < SET_BUTTON_YMAX){
+      else if(touch_point.y > SHUTDOWN_BUTTON_YMIN && touch_point.y < SHUTDOWN_BUTTON_YMAX){
         screen_index = 3;
       }
       background_drawn = false;
@@ -459,47 +457,46 @@ void update_GAS_screen(void){
 void update_HIST_screen(void){
   char accel_str[5];
   
-  hist_screen_update_counter++;
+  //Clearing the currently displayed acceleration values - SESSION MAXIMUM
+  dtostrf(last_session_max_accel[0], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, SESSION_AXIAL_XCOORD, SESSION_AXIAL_YCOORD);
+  dtostrf(last_session_max_accel[1], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, SESSION_LATERAL_XCOORD, SESSION_LATERAL_YCOORD);
+  dtostrf(last_session_max_accel[2], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, SESSION_VERTICAL_XCOORD, SESSION_VERTICAL_YCOORD);
   
-  if(hist_screen_update_counter == HIST_SCREEN_UPDATE_NUM){
-    //Clearing the currently displayed acceleration values - SESSION MAXIMUM
-    dtostrf(hist_last_session_max_accel[0], 5, 3, accel_str);
-    text_draw(accel_str, WHITE, SESSION_AXIAL_XCOORD, SESSION_AXIAL_YCOORD);
-    dtostrf(hist_last_session_max_accel[1], 5, 3, accel_str);
-    text_draw(accel_str, WHITE, SESSION_LATERAL_XCOORD, SESSION_LATERAL_YCOORD);
-    dtostrf(hist_last_session_max_accel[2], 5, 3, accel_str);
-    text_draw(accel_str, WHITE, SESSION_VERTICAL_XCOORD, SESSION_VERTICAL_YCOORD);
-  
-    //Clearing the currently displayed acceleration values - ALL TIME MAXIMUM
-    dtostrf(hist_last_all_time_max_accel[0], 5, 3, accel_str);
-    text_draw(accel_str, WHITE, ALLTIME_AXIAL_XCOORD, ALLTIME_AXIAL_YCOORD);
-    dtostrf(hist_last_all_time_max_accel[1], 5, 3, accel_str);
-    text_draw(accel_str, WHITE, ALLTIME_LATERAL_XCOORD, ALLTIME_LATERAL_YCOORD);
-    dtostrf(hist_last_all_time_max_accel[2], 5, 3, accel_str);
-    text_draw(accel_str, WHITE, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
-  
-    //Displaying New Acceleration Values - SESSION MAXIMUM
-    dtostrf(session_max_accel[0], 5, 3, accel_str);
-    text_draw(accel_str, BLACK, SESSION_AXIAL_XCOORD, SESSION_AXIAL_YCOORD);
-    dtostrf(session_max_accel[1], 5, 3, accel_str);
-    text_draw(accel_str, BLACK, SESSION_LATERAL_XCOORD, SESSION_LATERAL_YCOORD);
-    dtostrf(session_max_accel[2], 5, 3, accel_str);
-    text_draw(accel_str, BLACK, SESSION_VERTICAL_XCOORD, SESSION_VERTICAL_YCOORD);
-  
-    //Displaying New Acceleration Values - ALL TIME MAXIMUM
-    dtostrf(all_time_max_accel[0], 5, 3, accel_str);
-    text_draw(accel_str, BLACK, ALLTIME_AXIAL_XCOORD, ALLTIME_AXIAL_YCOORD);
-    dtostrf(all_time_max_accel[1], 5, 3, accel_str);
-    text_draw(accel_str, BLACK, ALLTIME_LATERAL_XCOORD, ALLTIME_LATERAL_YCOORD);
-    dtostrf(all_time_max_accel[2], 5, 3, accel_str);
-    text_draw(accel_str, BLACK, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
+  //Clearing the currently displayed acceleration values - ALL TIME MAXIMUM
+  dtostrf(last_all_time_max_accel[0], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, ALLTIME_AXIAL_XCOORD, ALLTIME_AXIAL_YCOORD);
+  dtostrf(last_all_time_max_accel[1], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, ALLTIME_LATERAL_XCOORD, ALLTIME_LATERAL_YCOORD);
+  dtostrf(last_all_time_max_accel[2], 5, 3, accel_str);
+  text_draw(accel_str, WHITE, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
 
-    for(int index = 0; index < 3; index++){
-      hist_last_all_time_max_accel[index] = all_time_max_accel[index];
-      hist_last_session_max_accel[index] = session_max_accel[index];
-    }
+  //Displaying New Acceleration Values - SESSION MAXIMUM
+  dtostrf(session_max_accel[0], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, SESSION_AXIAL_XCOORD, SESSION_AXIAL_YCOORD);
+  dtostrf(session_max_accel[1], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, SESSION_LATERAL_XCOORD, SESSION_LATERAL_YCOORD);
+  dtostrf(session_max_accel[2], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, SESSION_VERTICAL_XCOORD, SESSION_VERTICAL_YCOORD);
 
-    hist_screen_update_counter = 0;
+  //Displaying New Acceleration Values - ALL TIME MAXIMUM
+  dtostrf(all_time_max_accel[0], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, ALLTIME_AXIAL_XCOORD, ALLTIME_AXIAL_YCOORD);
+  dtostrf(all_time_max_accel[1], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, ALLTIME_LATERAL_XCOORD, ALLTIME_LATERAL_YCOORD);
+  dtostrf(all_time_max_accel[2], 5, 3, accel_str);
+  text_draw(accel_str, BLACK, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
+}
+
+//System Shutdown Function
+void shutdown_system(void){
+  tft.fillScreen(BLACK);
+  text_draw("Ready to Shutdown", WHITE, 0, 0);
+
+  while(true){
+    continue;
   }
 }
 
@@ -598,6 +595,10 @@ void loop(){
 
       case 2:   //The index for the History Screen
         update_HIST_screen();
+        break;
+
+      case 3:   //The index for the Shutdown Button
+        shutdown_system();
         break;
       
       default:
