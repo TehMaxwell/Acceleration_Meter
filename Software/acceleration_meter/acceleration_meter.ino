@@ -153,7 +153,6 @@ float graph_axial_accel_vals[GRAPH_NUM_POINTS], graph_lateral_accel_vals[GRAPH_N
 //DATA
 //Data File Names
 const char data_file_name[] = "DT.txt";   //File containing all time maximum acceleration data
-int hist_data_update_counter = 0;
 
 //Data Storage Variables
 float all_time_max_accel[3] = {0.0, 0.0, 0.0}, last_all_time_max_accel[3] = {0.0, 0.0, 0.0};
@@ -391,13 +390,7 @@ void update_all_time_maximum(void){
       all_time_max_accel[index] = accel_vals[index];  //Updating RAM stored value of the All Time Maximum Acceleration Value
     }
   }
-
-  hist_data_update_counter += 1;
-  
-  if(hist_data_update_counter > 99){
-    set_all_time_max_accel();
-    hist_data_update_counter = 0;
-  }
+  set_all_time_max_accel();
 }
 
 //GUI FUNCTIONS
@@ -461,22 +454,6 @@ void update_GAS_screen(void){
 
 //History Screen Update Function
 void update_HIST_screen(void){
-  bool update_screen = false;
-
-  //Checking if any of the maximum acceleration values have changed
-  for(int index = 0; index < 3; index++){
-    if(session_max_accel[index] > last_session_max_accel[index]){
-      update_screen = true;
-    }
-  }
-  if(update_screen != false){
-    update_HIST_screen_vals();
-    update_screen = false;
-  }
-}
-
-//Function to update the History Screen Values
-void update_HIST_screen_vals(void){
   char accel_str[5];
   
   //Clearing the currently displayed acceleration values - SESSION MAXIMUM
