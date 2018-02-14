@@ -116,6 +116,7 @@
 #define ALLTIME_LATERAL_YCOORD 211
 #define ALLTIME_VERTICAL_XCOORD 215
 #define ALLTIME_VERTICAL_YCOORD 211
+#define HIST_SCREEN_UPDATE_NUM 50
 
 //Timing Parameters
 #define DELAY_TIME 200  //The time between screen refreshes in milliseconds
@@ -132,6 +133,8 @@ const char boot_bmp_name[] = "BOOT.bmp";
 //Screen Parameters
 int screen_index = 0;
 bool background_drawn = false;
+int hist_screen_update_counter = HIST_SCREEN_UPDATE_NUM - 2;
+float hist_last_all_time_max_accel[3] = {0.0, 0.0, 0.0}, hist_last_session_max_accel[3] = {0.0, 0.0, 0.0};
 
 //Timing Parameters
 unsigned long start_time;
@@ -456,37 +459,48 @@ void update_GAS_screen(void){
 void update_HIST_screen(void){
   char accel_str[5];
   
-  //Clearing the currently displayed acceleration values - SESSION MAXIMUM
-  dtostrf(last_session_max_accel[0], 5, 3, accel_str);
-  text_draw(accel_str, WHITE, SESSION_AXIAL_XCOORD, SESSION_AXIAL_YCOORD);
-  dtostrf(last_session_max_accel[1], 5, 3, accel_str);
-  text_draw(accel_str, WHITE, SESSION_LATERAL_XCOORD, SESSION_LATERAL_YCOORD);
-  dtostrf(last_session_max_accel[2], 5, 3, accel_str);
-  text_draw(accel_str, WHITE, SESSION_VERTICAL_XCOORD, SESSION_VERTICAL_YCOORD);
+  hist_screen_update_counter++;
+  
+  if(hist_screen_update_counter == HIST_SCREEN_UPDATE_NUM){
+    //Clearing the currently displayed acceleration values - SESSION MAXIMUM
+    dtostrf(hist_last_session_max_accel[0], 5, 3, accel_str);
+    text_draw(accel_str, WHITE, SESSION_AXIAL_XCOORD, SESSION_AXIAL_YCOORD);
+    dtostrf(hist_last_session_max_accel[1], 5, 3, accel_str);
+    text_draw(accel_str, WHITE, SESSION_LATERAL_XCOORD, SESSION_LATERAL_YCOORD);
+    dtostrf(hist_last_session_max_accel[2], 5, 3, accel_str);
+    text_draw(accel_str, WHITE, SESSION_VERTICAL_XCOORD, SESSION_VERTICAL_YCOORD);
+  
+    //Clearing the currently displayed acceleration values - ALL TIME MAXIMUM
+    dtostrf(hist_last_all_time_max_accel[0], 5, 3, accel_str);
+    text_draw(accel_str, WHITE, ALLTIME_AXIAL_XCOORD, ALLTIME_AXIAL_YCOORD);
+    dtostrf(hist_last_all_time_max_accel[1], 5, 3, accel_str);
+    text_draw(accel_str, WHITE, ALLTIME_LATERAL_XCOORD, ALLTIME_LATERAL_YCOORD);
+    dtostrf(hist_last_all_time_max_accel[2], 5, 3, accel_str);
+    text_draw(accel_str, WHITE, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
+  
+    //Displaying New Acceleration Values - SESSION MAXIMUM
+    dtostrf(session_max_accel[0], 5, 3, accel_str);
+    text_draw(accel_str, BLACK, SESSION_AXIAL_XCOORD, SESSION_AXIAL_YCOORD);
+    dtostrf(session_max_accel[1], 5, 3, accel_str);
+    text_draw(accel_str, BLACK, SESSION_LATERAL_XCOORD, SESSION_LATERAL_YCOORD);
+    dtostrf(session_max_accel[2], 5, 3, accel_str);
+    text_draw(accel_str, BLACK, SESSION_VERTICAL_XCOORD, SESSION_VERTICAL_YCOORD);
+  
+    //Displaying New Acceleration Values - ALL TIME MAXIMUM
+    dtostrf(all_time_max_accel[0], 5, 3, accel_str);
+    text_draw(accel_str, BLACK, ALLTIME_AXIAL_XCOORD, ALLTIME_AXIAL_YCOORD);
+    dtostrf(all_time_max_accel[1], 5, 3, accel_str);
+    text_draw(accel_str, BLACK, ALLTIME_LATERAL_XCOORD, ALLTIME_LATERAL_YCOORD);
+    dtostrf(all_time_max_accel[2], 5, 3, accel_str);
+    text_draw(accel_str, BLACK, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
 
-  //Clearing the currently displayed acceleration values - ALL TIME MAXIMUM
-  dtostrf(last_all_time_max_accel[0], 5, 3, accel_str);
-  text_draw(accel_str, WHITE, ALLTIME_AXIAL_XCOORD, ALLTIME_AXIAL_YCOORD);
-  dtostrf(last_all_time_max_accel[1], 5, 3, accel_str);
-  text_draw(accel_str, WHITE, ALLTIME_LATERAL_XCOORD, ALLTIME_LATERAL_YCOORD);
-  dtostrf(last_all_time_max_accel[2], 5, 3, accel_str);
-  text_draw(accel_str, WHITE, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
+    for(int index = 0; index < 3; index++){
+      hist_last_all_time_max_accel[index] = all_time_max_accel[index];
+      hist_last_session_max_accel[index] = session_max_accel[index];
+    }
 
-  //Displaying New Acceleration Values - SESSION MAXIMUM
-  dtostrf(session_max_accel[0], 5, 3, accel_str);
-  text_draw(accel_str, BLACK, SESSION_AXIAL_XCOORD, SESSION_AXIAL_YCOORD);
-  dtostrf(session_max_accel[1], 5, 3, accel_str);
-  text_draw(accel_str, BLACK, SESSION_LATERAL_XCOORD, SESSION_LATERAL_YCOORD);
-  dtostrf(session_max_accel[2], 5, 3, accel_str);
-  text_draw(accel_str, BLACK, SESSION_VERTICAL_XCOORD, SESSION_VERTICAL_YCOORD);
-
-  //Displaying New Acceleration Values - ALL TIME MAXIMUM
-  dtostrf(all_time_max_accel[0], 5, 3, accel_str);
-  text_draw(accel_str, BLACK, ALLTIME_AXIAL_XCOORD, ALLTIME_AXIAL_YCOORD);
-  dtostrf(all_time_max_accel[1], 5, 3, accel_str);
-  text_draw(accel_str, BLACK, ALLTIME_LATERAL_XCOORD, ALLTIME_LATERAL_YCOORD);
-  dtostrf(all_time_max_accel[2], 5, 3, accel_str);
-  text_draw(accel_str, BLACK, ALLTIME_VERTICAL_XCOORD, ALLTIME_VERTICAL_YCOORD);
+    hist_screen_update_counter = 0;
+  }
 }
 
 /*
